@@ -1,14 +1,17 @@
 import os
 from class_model import Model
 import numpy as np
-import migraphx
+import onnxruntime as ort
 
 class Model(Model):
   def __init__(self):
     super().__init__()
-    self.model = None
+    self.sess = None
+    self.sess_data = {'providers': ['VitisAIExecutionProvider']}
     self.model_path = 'yolov8n_fp16{batch}b.onnx'
-    self.model_description = 'YOLOv8n inference using direct MIGraphX with cache'
+    self.model_description = 'YOLOv8n FP16 inference with using Vitis AI Execution Provider'
+    if not self.sess_data['providers'][0] in ort.get_available_providers():
+      raise Exception(f'Vitis AI Execution Provider is not available')
   def prepare_batch(self, batch_size):
     file_path = self.get_file_path(self.model_path.format(batch=batch_size))
     if not os.path.exists(file_path):
@@ -23,25 +26,16 @@ class Model(Model):
           raise Exception(f'YOLO model file {yolo_model_path} not found')
       except Exception as e:
         raise Exception(f'Failed to export model {e}')
-    # Compile model to MIGraphX binary cache
-    cache_path = file_path[:-4] + 'mxr'
-    if not os.path.exists(cache_path):
-      try:
-        model = migraphx.parse_onnx(file_path)
-        model.compile(migraphx.get_target("gpu"))
-        model.save(cache_path)
-        del model
-      except Exception as e:
-        raise Exception(f'Failed to compile and save MIGraphX model: {e}')
+    pass
   def read(self):
     file_path = self.get_file_path(self.model_path.format(batch=self.batch_size))
-    cache_path = file_path[:-4] + 'mxr'
-    self.model = migraphx.load(cache_path)
+    self.sess = ort.InferenceSession(file_path, **self.sess_data)
   def prepare(self):
-    self.input_data = np.random.randn(self.batch_size, 3, 640, 640).astype(np.float32)
+    self.input_data = {
+      'images': np.random.randn(self.batch_size, 3, 640, 640).astype(np.float32),
+    }
   def inference(self):
-    return self.model.run({'images': self.input_data})
+    #return self.sess.run(['output0'], input_feed=self.input_data)
+    return self.sess.run([], input_feed=self.input_data)
   def shutdown(self):
-    if self.model:
-      del self.model
-      self.model = None
+    pass
