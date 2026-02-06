@@ -270,6 +270,7 @@ def performance_report(model,model_name, read_times, inference_times, warm_up_ti
     main_sheet.merge_cells(start_row=main_sheet.max_row, start_column=2, end_row=main_sheet.max_row, end_column=10)
 
     try:
+        main_sheet.append(['CPU:', platform.processor()])
         accelerators = enumerate_accelerators()
         for item in accelerators['gpu']:
             main_sheet.append(['GPU:', item['name']])
