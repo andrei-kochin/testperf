@@ -10,12 +10,14 @@ class Model(Model):
     self.model = None
     self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     self.model_path = './yolov8n.pt'
-    self.model_description = 'YOLOv8n inference with using default Torch'
+    self.model_description = 'YOLOv8n inference with using default Torch.Compile'
   def read(self):
     if not os.path.exists(self.model_path):
       raise Exception(f'Model file {self.model_path} not found')
     self.model = YOLO(self.model_path)
     self.model.to(self.device)
+    # Compile the model for improved performance
+    self.model.model = torch.compile(self.model.model, mode='default')
   def prepare(self):
     # Create random input tensor (B, C, H, W)
     self.input_data = torch.randn(
@@ -28,8 +30,7 @@ class Model(Model):
     self.input_data = (self.input_data - min_val) / (max_val - min_val)
   def inference(self):
     with torch.no_grad():
-      results = self.model(self.input_data, verbose=False)
-    return results
+      return self.model(self.input_data, verbose=False)
   def shutdown(self):
     if self.model is not None:
       del self.model
