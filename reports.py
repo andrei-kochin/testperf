@@ -1,7 +1,10 @@
 import sys
+import os
 import subprocess
 import datetime
+import platform
 from copy import deepcopy
+from shutil import copy, which
 
 def performance_report(model,model_name, read_times, inference_times, warm_up_times, batches):
   try:
@@ -257,7 +260,6 @@ def performance_report(model,model_name, read_times, inference_times, warm_up_ti
     main_sheet.append([])
     main_sheet.append(['System Information:'])
     try:
-        import platform
         main_sheet.append(['Hostname:', platform.node()])
         main_sheet.append(['OS:', platform.system()])
         main_sheet.append(['OS Version:', platform.version()])
@@ -281,7 +283,18 @@ def performance_report(model,model_name, read_times, inference_times, warm_up_ti
 
     workbook_path = f"{platform.node().lower()}_{model_name}_{report_datetime.strftime('%Y%m%d_%H%M%S')}.xlsx"
     wb.save(workbook_path)
-    print(f"{{ \"Workbook\": \"{workbook_path}\" }}")
+
+    reports_path = os.path.join(os.path.dirname(__file__), 'reports', report_datetime.strftime("%Y%m%d"))
+    if not os.path.exists(reports_path):
+      os.makedirs(reports_path)
+      # Copying statistics aggregator to a reports folder
+      try:
+        copy(os.path.join(os.path.dirname(__file__), "!StatViewer.xlsm"), os.path.join(reports_path, "!StatViewer.xlsm"))
+      except Exception as e:
+        print(f'{{ "Error": "Failed to copy !StatViewer.xlsm {e}" }}')
+    os.rename(workbook_path, os.path.join(reports_path, workbook_path))
+
+    print(f"{{ \"Workbook\": \"{os.path.join(reports_path, workbook_path)}\" }}")
 
   except Exception as e:
     print(f'{{ "Error": "Failed to load openpyxl {e}" }}')
