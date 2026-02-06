@@ -19,7 +19,7 @@ class Model(Model):
       try:
         model = migraphx.parse_onnx(file_path)
         model.compile(migraphx.get_target("gpu"))
-        model.save(cache_path)
+        migraphx.save(model, cache_path)
         del model
       except Exception as e:
         raise Exception(f'Failed to compile and save MIGraphX model: {e}')

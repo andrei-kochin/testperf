@@ -30,7 +30,7 @@ class Model(Model):
     with torch.no_grad():
       results = self.model(self.input_data, verbose=False)
     return results
- def shutdown(self):
+  def shutdown(self):
     if self.model is not None:
       del self.model
       torch.cuda.empty_cache() if torch.cuda.is_available() else None
