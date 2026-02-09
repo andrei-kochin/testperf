@@ -13,7 +13,7 @@ class Model(Model):
     self.model_description = 'YOLOv8n FP16 inference with using ONNX Runtime'
   def prepare_batch(self, batch_size):
     file_path = self.get_file_path(self.model_path.format(batch=batch_size))
-    try_export_model(file_path, batch_size)
+    try_export_model(file_path, batch_size, half_precision=True)
   def read(self):
     file_path = self.get_file_path(self.model_path.format(batch=self.batch_size))
     self.sess = ort.InferenceSession(file_path, **self.sess_data)

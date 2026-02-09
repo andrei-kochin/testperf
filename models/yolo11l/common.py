@@ -1,6 +1,6 @@
 import os
 
-def try_export_model(file_path, batch_size):
+def try_export_model(file_path, batch_size, half_precision=False):
     if not os.path.exists(file_path):
       try:
         yolo_model_path = 'yolov11l.pt'
@@ -13,7 +13,7 @@ def try_export_model(file_path, batch_size):
         if os.path.exists(yolo_model_path):
           from ultralytics import YOLO
           model = YOLO(yolo_model_path)
-          model.export(format='onnx', imgsz=640, batch=batch_size, half=True)
+          model.export(format='onnx', imgsz=640, batch=batch_size, half=half_precision)
           os.rename(yolo_model_path[:-2] + 'onnx', file_path)
         else:
           raise Exception(f'YOLO model file {yolo_model_path} not found')

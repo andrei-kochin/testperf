@@ -15,7 +15,7 @@ class Model(Model):
       raise Exception(f'MIGraphX Execution Provider is not available')
   def prepare_batch(self, batch_size):
     file_path = self.get_file_path(self.model_path.format(batch=batch_size))
-    try_export_model(file_path, batch_size)
+    try_export_model(file_path, batch_size, half_precision=True)
     cache_path = file_path[:-4] + 'migx'
     if not os.path.exists(cache_path):
       try:

@@ -12,7 +12,7 @@ class Model(Model):
     self.model_description = 'YOLOv8n inference using direct MIGraphX with cache'
   def prepare_batch(self, batch_size):
     file_path = self.get_file_path(self.model_path.format(batch=batch_size))
-    try_export_model(file_path, batch_size)
+    try_export_model(file_path, batch_size, half_precision=True)
     # Compile model to MIGraphX binary cache
     cache_path = file_path[:-4] + 'mxr'
     if not os.path.exists(cache_path):
