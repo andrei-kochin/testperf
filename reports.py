@@ -291,6 +291,13 @@ def performance_report(model,model_name, read_times, inference_times, warm_up_ti
     except Exception as e:
         main_sheet.append([f'Cannot get PIP list {e}'])
 
+    try:
+        main_sheet.append(['Loaded Modules:'])
+        for item in list_loaded_modules()['modules']:
+            main_sheet.append([item['name'], item['path']])
+    except Exception as e:
+        main_sheet.append([f'Cannot get loaded modules {e}'])
+
     workbook_path = f"{platform.node().lower()}_{model_name}_{report_datetime.strftime('%Y%m%d_%H%M%S')}.xlsx"
     wb.save(workbook_path)
 
@@ -437,3 +444,154 @@ def enumerate_accelerators():
     if osname == "Darwin":
         return {"gpu": _mac_gpus(), "npu": _mac_npus()}
     return {"gpu": [], "npu": []}
+
+def list_loaded_modules():
+    osname = platform.system()
+    result = {
+        'pid': os.getpid(),
+        'executable': sys.executable,
+        'modules': []
+    }
+
+    if osname == "Windows":
+        result['modules'] = _windows_list_modules()
+    elif osname == "Linux":
+        result['modules'] = _linux_list_modules()
+    elif osname == "Darwin":
+        result['modules'] = _mac_list_modules()
+
+    return result
+
+def _windows_list_modules():
+    modules = []
+
+    # Try using psutil first (most reliable cross-platform method)
+    try:
+        import psutil
+        process = psutil.Process()
+        for dll in process.memory_maps():
+            modules.append({
+                'name': os.path.basename(dll.path),
+                'path': dll.path
+            })
+        return modules
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    # Fallback to ctypes approach
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        psapi = ctypes.windll.psapi
+
+        hProcess = kernel32.GetCurrentProcess()
+
+        hMods = (wintypes.HMODULE * 1024)()
+        cbNeeded = wintypes.DWORD()
+
+        if psapi.EnumProcessModules(hProcess, ctypes.byref(hMods), ctypes.sizeof(hMods), ctypes.byref(cbNeeded)):
+            count = int(cbNeeded.value / ctypes.sizeof(wintypes.HMODULE))
+
+            for i in range(count):
+                module_name = ctypes.create_unicode_buffer(260)
+                module_path = ctypes.create_unicode_buffer(260)
+
+                if psapi.GetModuleFileNameExW(hProcess, hMods[i], module_path, ctypes.sizeof(module_path)):
+                    if psapi.GetModuleBaseNameW(hProcess, hMods[i], module_name, ctypes.sizeof(module_name)):
+                        modules.append({
+                            'name': module_name.value,
+                            'path': module_path.value,
+                            'base_address': hex(hMods[i]) if hMods[i] else None
+                        })
+    except Exception as e:
+        # If all else fails, return error info
+        modules.append({'error': str(e)})
+
+    return modules
+
+def _linux_list_modules():
+    modules = []
+    seen_paths = set()
+
+    # Try using psutil first
+    try:
+        import psutil
+        process = psutil.Process()
+        for mmap in process.memory_maps():
+            if mmap.path and mmap.path not in seen_paths:
+                seen_paths.add(mmap.path)
+                modules.append({
+                    'name': os.path.basename(mmap.path),
+                    'path': mmap.path
+                })
+        return modules
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    # Fallback to reading /proc/self/maps
+    try:
+        with open('/proc/self/maps', 'r') as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 6:
+                    pathname = ' '.join(parts[5:])
+                    if pathname and pathname not in ['[stack]', '[heap]', '[vdso]', '[vsyscall]']:
+                        if pathname.startswith('/') and pathname not in seen_paths:
+                            seen_paths.add(pathname)
+                            address = parts[0].split('-')[0]
+                            modules.append({
+                                'name': os.path.basename(pathname),
+                                'path': pathname,
+                                'base_address': '0x' + address
+                            })
+    except Exception as e:
+        modules.append({'error': str(e)})
+
+    return modules
+
+def _mac_list_modules():
+    modules = []
+
+    # Try using psutil first
+    try:
+        import psutil
+        process = psutil.Process()
+        for mmap in process.memory_maps():
+            if mmap.path:
+                modules.append({
+                    'name': os.path.basename(mmap.path),
+                    'path': mmap.path
+                })
+        return modules
+    except ImportError:
+        pass
+    except Exception:
+        pass
+
+    # Fallback to vmmap command
+    try:
+        pid = os.getpid()
+        out, _, rc = _run(['vmmap', str(pid)], timeout=10)
+        if rc == 0 and out:
+            seen_paths = set()
+            for line in out.splitlines():
+                if '/' in line:
+                    parts = line.split()
+                    for part in parts:
+                        if part.startswith('/') and os.path.exists(part):
+                            if part not in seen_paths:
+                                seen_paths.add(part)
+                                modules.append({
+                                    'name': os.path.basename(part),
+                                    'path': part
+                                })
+    except Exception as e:
+        modules.append({'error': str(e)})
+
+    return modules
