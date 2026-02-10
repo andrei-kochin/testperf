@@ -169,7 +169,7 @@ if '--last' in sys.argv:
         count_idx = sys.argv.index('--count')
         if count_idx + 1 < len(sys.argv):
             value = int(sys.argv[count_idx + 1]) + 1
-            if value > 0:
+            if value >= 0:
                 end_index = start_index + value
             elif (end_index + -value) > 0:
                 end_index = end_index - value
@@ -181,7 +181,7 @@ if '--single' in sys.argv:
         single_idx = sys.argv.index('--single')
         if single_idx + 1 < len(sys.argv):
             value = int(sys.argv[single_idx + 1])
-            if value > 0:
+            if value >= 0:
                 start_index = value
                 end_index = value + 1
             else:
