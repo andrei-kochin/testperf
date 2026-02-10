@@ -293,10 +293,18 @@ def performance_report(model,model_name, read_times, inference_times, warm_up_ti
 
     try:
         main_sheet.append(['Loaded Modules:'])
-        for item in list_loaded_modules()['modules']:
+        for item in sorted(list_loaded_modules()['modules'], key=lambda x: x['name']):
             main_sheet.append([item['name'], item['path']])
     except Exception as e:
         main_sheet.append([f'Cannot get loaded modules {e}'])
+
+    try:
+        main_sheet.append([])
+        main_sheet.append(['Environment Variables:'])
+        for key, value in sorted(os.environ.items(), key=lambda x: x[0]):
+            main_sheet.append([key, value])
+    except Exception as e:
+        main_sheet.append([f'Cannot get environment variables {e}'])
 
     workbook_path = f"{platform.node().lower()}_{model_name}_{report_datetime.strftime('%Y%m%d_%H%M%S')}.xlsx"
     wb.save(workbook_path)
