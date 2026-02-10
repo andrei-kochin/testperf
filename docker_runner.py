@@ -212,7 +212,7 @@ for i in range(start_index, end_index):
     only_prepare = config.get('only_prepare', False) or ('--only-prepare' in sys.argv)
     docker_custom_run = config.get('docker_custom_run', '')
     tests = config.get('tests', [])
-    
+
     print(f"=== Processing configuration {i} ===")
     # Check if docker image exists
     docker_image_exists = False
@@ -221,7 +221,7 @@ for i in range(start_index, end_index):
         print(f"  Command: {' '.join(check_cmd)}")
         result = subprocess.run(check_cmd, cwd=script_folder, capture_output=True)
         docker_image_exists = (result.returncode == 0)
-    
+
     # Build image if docker_image doesn't exist but docker_file does
     if (not docker_image_exists) or (not docker_image and docker_file):
         if docker_file.startswith('docker pull '):
@@ -244,7 +244,7 @@ for i in range(start_index, end_index):
                 if result.returncode != 0:
                     print(f"Error: Failed to build image from {docker_file}, to continue from this point, use --continue {i}")
                     continue
-    
+
     # Build the docker run command
     if docker_custom_run:
         # Use custom run command as base
@@ -252,23 +252,23 @@ for i in range(start_index, end_index):
     else:
         # Default docker container run command
         docker_cmd = ['docker', 'container', 'run']
-    
+
     # Add volume mount for current script's folder
     docker_cmd.extend(['-v', f'{script_folder}:/root/testperf'])
-    
+
     # Remove container after run
     docker_cmd.append('--rm')
-    
+
     # Set workdir
     docker_cmd.extend(['--workdir=/root/testperf'])
 
     # set docker hostname if it is provided
     if 'docker_hostname' in config:
         docker_cmd.extend(['--hostname', config['docker_hostname']])
-    
+
     # Add docker image
     docker_cmd.append(docker_image)
-    
+
     if (('--single' in sys.argv) and ('--shell' in sys.argv)):
         docker_cmd.insert(-1, '-it');
         print(f"Running shell: {' '.join(docker_cmd)}")
@@ -285,7 +285,7 @@ for i in range(start_index, end_index):
             print(f"Running single test: {tests}")
         except Exception as e:
             continue
-    
+
     # Run each test
     for test in tests:
         print(f"\n--- Running test: {test} ---")
@@ -296,10 +296,10 @@ for i in range(start_index, end_index):
         test_cmd[-1] = test_cmd[-1] + f'{test} --batch-size {",".join(map(str, batches))}'
         if only_prepare:
             test_cmd[-1] = test_cmd[-1] + ' --only-prepare'
-        
+
         print(f"Command: {' '.join(test_cmd)}")
         print()
-        
+
         if not '--fake' in sys.argv:
             # Run the docker command
             result = subprocess.run(test_cmd, cwd=script_folder)
@@ -308,6 +308,15 @@ for i in range(start_index, end_index):
                 print(f"Error: Test {test} failed with exit code {result.returncode}, to continue from this point, use --continue {i} --case {test}, or --single {i} --case {test}")
                 continue
 
+    if dont_remove == False:
+        print(f"Removing image {docker_image}...")
+        remove_cmd = ['docker', 'image', 'rm', docker_image]
+        print(f"  Command: {' '.join(remove_cmd)}")
+        if not '--fake' in sys.argv:
+            result = subprocess.run(remove_cmd, cwd=script_folder)
+            if result.returncode != 0:
+                print(f"Error: Failed to remove image {docker_image}, to continue from this point, use --continue {i}")
+                continue
 
 print("All operations completed")
 total_time = perf_counter() - script_run_time
