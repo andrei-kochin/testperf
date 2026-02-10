@@ -1,7 +1,7 @@
 FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
 
 # Install dependencies
-RUN pip install ultralytics
+RUN pip install ultralytics onnxruntime-gpu
 
 # Installing headless version of OpenCV
 RUN pip uninstall opencv-python -y
