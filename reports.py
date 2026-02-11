@@ -126,11 +126,11 @@ def performance_report(model,model_name, read_times, inference_times, warm_up_ti
         inference_sheet[col_letter + str(offset_stat_row + 5)] = "=MIN(" + col_letter + str(offset_row) + ":" + col_letter + str(last_row) + ")"
         inference_sheet[col_letter + str(offset_stat_row + 6)] = "=MAX(" + col_letter + str(offset_row) + ":" + col_letter + str(last_row) + ")"
         # Inference Per Second depending on calculated time
-        inference_sheet[col_letter + str(offset_stat_row + 7)] = "=1000 / " + col_letter + str(offset_stat_row + 0)
-        inference_sheet[col_letter + str(offset_stat_row + 8)] = "=1000 / " + col_letter + str(offset_stat_row + 1)
-        inference_sheet[col_letter + str(offset_stat_row + 9)] = "=1000 / " + col_letter + str(offset_stat_row + 2)
-        inference_sheet[col_letter + str(offset_stat_row + 10)] = "=1000 / " + col_letter + str(offset_stat_row + 3)
-        inference_sheet[col_letter + str(offset_stat_row + 11)] = "=1000 / " + col_letter + str(offset_stat_row + 4)
+        inference_sheet[col_letter + str(offset_stat_row + 7)] = "=1 / " + col_letter + str(offset_stat_row + 0)
+        inference_sheet[col_letter + str(offset_stat_row + 8)] = "=1 / " + col_letter + str(offset_stat_row + 1)
+        inference_sheet[col_letter + str(offset_stat_row + 9)] = "=1 / " + col_letter + str(offset_stat_row + 2)
+        inference_sheet[col_letter + str(offset_stat_row + 10)] = "=1 / " + col_letter + str(offset_stat_row + 3)
+        inference_sheet[col_letter + str(offset_stat_row + 11)] = "=1 / " + col_letter + str(offset_stat_row + 4)
         # Batch Per Second depending on IPS
         inference_sheet[col_letter + str(offset_stat_row + 12)] = "=" + str(batches[batch_index]) + " * " + col_letter + str(offset_stat_row + 7)
         inference_sheet[col_letter + str(offset_stat_row + 13)] = "=" + str(batches[batch_index]) + " * " + col_letter + str(offset_stat_row + 8)
