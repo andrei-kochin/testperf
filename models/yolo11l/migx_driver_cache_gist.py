@@ -14,6 +14,27 @@ def _parse_csv_ints(raw: str) -> List[int]:
   return [int(x.strip()) for x in raw.split(",") if x.strip()]
 
 
+def _parse_target(argv: List[str]) -> Tuple[str, bool]:
+  """
+  Returns (target, is_forced).
+
+  - If user passes `--target <gpu|cpu|ref>`, it is considered forced (no fallback).
+  - Otherwise defaults to "gpu" and is not forced (we may fallback if GPU isn't available).
+  """
+  if "--target" not in argv:
+    return ("gpu", False)
+
+  i = argv.index("--target")
+  if i + 1 >= len(argv):
+    return ("gpu", False)
+
+  raw = (argv[i + 1] or "").strip().lower()
+  if raw in ("gpu", "cpu", "ref"):
+    return (raw, True)
+
+  return ("gpu", False)
+
+
 def _parse_imgsz(argv: List[str]) -> Tuple[int, int]:
   if "--imgsz" not in argv:
     return (640, 640)
@@ -44,6 +65,14 @@ def _round_up_to_stride(x: int, stride: int = 32) -> int:
   if x <= 0:
     return x
   return ((x + stride - 1) // stride) * stride
+
+
+def _looks_like_no_device_error(text: str) -> bool:
+  s = (text or "").lower()
+  # Seen in the wild (your log):
+  #   get_device_id: No device
+  #   ... device_name.cpp ... No device
+  return ("no device" in s) or ("get_device_id" in s) or ("device_name.cpp" in s)
 
 
 def get_migraphx_driver_version() -> str:
@@ -177,12 +206,24 @@ def compile_to_mxr(
   mxr_path: str,
   quantize_fp16: bool,
   force_driver: bool,
+  target: str,
+  allow_fallback: bool,
 ) -> str:
   """
   Compile ONNX -> MXR.
   Prefers Python MIGraphX (for FP16 quantization like the gist) if available, unless forced.
-  Returns "python" or "driver".
+  Returns a string like "python(gpu)" or "driver(cpu)".
   """
+  target = (target or "gpu").strip().lower()
+  if target not in ("gpu", "cpu", "ref"):
+    target = "gpu"
+
+  target_order = [target]
+  if allow_fallback:
+    for t in ("gpu", "cpu", "ref"):
+      if t not in target_order:
+        target_order.append(t)
+
   if not force_driver:
     try:
       import migraphx  # type: ignore
@@ -195,21 +236,65 @@ def compile_to_mxr(
           # Not all builds expose quantize_fp16; continue without it.
           pass
 
-      try:
-        prog.compile(t=migraphx.get_target("gpu"), offload_copy=False)
-      except TypeError:
-        prog.compile(migraphx.get_target("gpu"))
+      last_exc: Optional[BaseException] = None
+      for idx, t in enumerate(target_order):
+        try:
+          try:
+            prog.compile(t=migraphx.get_target(t), offload_copy=False)
+          except TypeError:
+            # Older python bindings don't take `t=...`/`offload_copy` kwargs.
+            prog.compile(migraphx.get_target(t))
 
-      migraphx.save(prog, mxr_path)
-      return "python"
+          migraphx.save(prog, mxr_path)
+          return f"python({t})"
+        except Exception as e:
+          last_exc = e
+          # Only fall back from GPU -> CPU/REF when it looks like the GPU is not present.
+          # (Otherwise we risk masking real GPU compilation bugs by switching targets.)
+          if (idx == 0) and (t == "gpu") and allow_fallback and _looks_like_no_device_error(str(e)):
+            continue
+          # Fall back from CPU -> REF if enabled, otherwise stop.
+          if (idx == 0) and (t == "cpu") and allow_fallback:
+            continue
+          break
+
+      if last_exc is not None:
+        raise last_exc
     except Exception:
       pass
 
-  compile_cmd = [migx_binary, "compile", onnx_path, "--gpu", "--binary", "-o", mxr_path]
-  result = subprocess.run(compile_cmd, capture_output=True, text=True)
-  if result.returncode != 0:
-    raise Exception(f"Failed to compile model via migraphx-driver: {result.stderr}")
-  return "driver"
+  def _driver_compile(cmd_target: str) -> subprocess.CompletedProcess[str]:
+    flag = f"--{cmd_target}"
+    compile_cmd = [migx_binary, "compile", onnx_path, flag, "--binary", "-o", mxr_path]
+    return subprocess.run(compile_cmd, capture_output=True, text=True)
+
+  last_err: str = ""
+  for idx, t in enumerate(target_order):
+    result = _driver_compile(t)
+    if result.returncode == 0:
+      return f"driver({t})"
+    last_err = (result.stderr or "") + (result.stdout or "")
+
+    # If GPU isn't available, it's common to fail-fast; CPU/ref fallback can still work.
+    if (idx == 0) and (t == "gpu"):
+      if allow_fallback and _looks_like_no_device_error(last_err):
+        continue
+      break
+
+    # If CPU compile fails, try ref as a last resort (when fallback is enabled).
+    if (idx == 0) and (t == "cpu") and allow_fallback:
+      continue
+
+    break
+
+  if _looks_like_no_device_error(last_err):
+    raise Exception(
+      "Failed to compile model via migraphx-driver (no GPU device visible). "
+      "Try `--target cpu` (or install/configure ROCm/HIP so a GPU is visible). "
+      f"Details: {last_err.strip()}"
+    )
+
+  raise Exception(f"Failed to compile model via migraphx-driver: {last_err.strip()}")
 
 
 def run_perf(mxr_path: str) -> str:
@@ -253,13 +338,20 @@ def main(argv: Optional[List[str]] = None, *, default_fp16: bool = False) -> int
   quantize_fp16 = ("--quantize-fp16" in argv) or default_fp16 or ("--fp16" in argv)
   force_driver = "--compile-with-driver" in argv
   dry_run = "--dry-run" in argv
+  target, target_forced = _parse_target(argv)
+  allow_fallback = not target_forced
 
   weights_path = "yolov11l.pt"
   weights_url = "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11l.pt"
 
   migraphx_version = get_migraphx_driver_version()
   print(f'{{ "MIGraphX Version": "{migraphx_version}" }},')
-  print(f'{{ "Batches": {batches}, "imgsz": [{imgsz[0]}, {imgsz[1]}], "export_half": {export_half}, "quantize_fp16": {quantize_fp16}, "dynamic": {export_dynamic}, "force_driver_compile": {force_driver} }},')
+  print(
+    f'{{ "Batches": {batches}, "imgsz": [{imgsz[0]}, {imgsz[1]}], '
+    f'"export_half": {export_half}, "quantize_fp16": {quantize_fp16}, '
+    f'"dynamic": {export_dynamic}, "force_driver_compile": {force_driver}, '
+    f'"target": "{target}", "auto_fallback": {allow_fallback} }},'
+  )
 
   if dry_run:
     print('{ "Status": "DryRun" }')
@@ -304,6 +396,8 @@ def main(argv: Optional[List[str]] = None, *, default_fp16: bool = False) -> int
           mxr_path=mxr_path,
           quantize_fp16=quantize_fp16,
           force_driver=force_driver,
+          target=target,
+          allow_fallback=allow_fallback,
         )
         compile_time = perf_counter() - start_time
         print(f'{{ "Compile Time": {compile_time}, "Compiler": "{compiler}" }},')
@@ -594,6 +688,7 @@ class Model(__import__("class_model", fromlist=["Model"]).Model):  # test_perf.p
     self.export_half = False
     self.quantize_fp16 = False
     self.force_driver_compile = False
+    self.target = "gpu"  # can be changed by the harness if desired
 
     self.model_description = "YOLOv11l inference using gist-style MIGraphX export/compile + Python migraphx cache"
 
@@ -621,6 +716,8 @@ class Model(__import__("class_model", fromlist=["Model"]).Model):  # test_perf.p
         mxr_path=mxr_path,
         quantize_fp16=self.quantize_fp16,
         force_driver=self.force_driver_compile,
+        target=self.target,
+        allow_fallback=True,
       )
 
   def read(self):
