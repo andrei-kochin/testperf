@@ -1,1 +1,4 @@
 openpyxl
+numpy
+onnx
+ultralytics
