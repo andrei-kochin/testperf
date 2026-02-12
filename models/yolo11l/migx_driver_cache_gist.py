@@ -576,6 +576,82 @@ def main(argv: Optional[List[str]] = None, *, default_fp16: bool = False) -> int
   return 0
 
 
+class Model(__import__("class_model", fromlist=["Model"]).Model):  # test_perf.py compatibility wrapper
+  """
+  `test_perf.py` expects a `Model` class in the imported module.
+
+  This wrapper uses the gist-style export/compile path to create an `.mxr` cache,
+  then runs inference via Python `migraphx` (like other MIGraphX models in this repo).
+  """
+
+  def __init__(self):
+    super().__init__()
+    self.model = None
+    self.input_data = None
+
+    self.imgsz = (640, 640)
+    self.export_dynamic = True
+    self.export_half = False
+    self.quantize_fp16 = False
+    self.force_driver_compile = False
+
+    self.model_description = "YOLOv11l inference using gist-style MIGraphX export/compile + Python migraphx cache"
+
+  def prepare_batch(self, batch_size: int):
+    self.imgsz = (_round_up_to_stride(self.imgsz[0], 32), _round_up_to_stride(self.imgsz[1], 32))
+
+    onnx_name = f"yolov11l_{batch_size}b_{self.imgsz[0]}x{self.imgsz[1]}_gist.onnx"
+    onnx_path = self.get_file_path(onnx_name)
+    mxr_path = onnx_path[:-4] + "mxr"
+
+    ensure_onnx_exported(
+      onnx_path=onnx_path,
+      batch=batch_size,
+      imgsz=self.imgsz,
+      weights_path="yolov11l.pt",
+      weights_url="https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11l.pt",
+      export_half=self.export_half,
+      export_dynamic=self.export_dynamic,
+    )
+    fix_onnx_input_shape_inplace(onnx_path, batch_size, self.imgsz)
+
+    if not os.path.exists(mxr_path):
+      compile_to_mxr(
+        onnx_path=onnx_path,
+        mxr_path=mxr_path,
+        quantize_fp16=self.quantize_fp16,
+        force_driver=self.force_driver_compile,
+      )
+
+  def read(self):
+    try:
+      import migraphx  # type: ignore
+    except Exception as e:
+      raise Exception(
+        "Python package `migraphx` is required for `test_perf.py` inference runs. "
+        "If you only have `migraphx-driver`, run this module directly instead: "
+        "`python -m models.yolo11l.migx_driver_cache_gist ...`"
+      ) from e
+
+    onnx_name = f"yolov11l_{self.batch_size}b_{self.imgsz[0]}x{self.imgsz[1]}_gist.onnx"
+    onnx_path = self.get_file_path(onnx_name)
+    mxr_path = onnx_path[:-4] + "mxr"
+    self.model = migraphx.load(mxr_path)
+
+  def prepare(self):
+    import numpy as np
+
+    self.input_data = np.random.randn(self.batch_size, 3, 640, 640).astype(np.float32)
+
+  def inference(self):
+    return self.model.run({"images": self.input_data})
+
+  def shutdown(self):
+    if self.model is not None:
+      del self.model
+      self.model = None
+
+
 if __name__ == "__main__":
   raise SystemExit(main())
 
