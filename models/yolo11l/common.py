@@ -1,6 +1,24 @@
 import os
 import onnx
-from onnxruntime.tools.onnx_model_utils import make_input_shape_fixed
+from typing import List
+
+
+def _make_input_shape_fixed_fallback(onnx_model: "onnx.ModelProto", input_name: str, shape: List[int]) -> None:
+  """
+  Pure-onnx fallback for fixing an input tensor shape.
+
+  This mirrors the behavior we want from:
+    onnxruntime.tools.onnx_model_utils.make_input_shape_fixed
+  but avoids requiring `onnxruntime` just to edit the ONNX graph.
+  """
+  for inp in onnx_model.graph.input:
+    if inp.name != input_name:
+      continue
+    dims = inp.type.tensor_type.shape.dim
+    for i, v in enumerate(shape[: len(dims)]):
+      dims[i].dim_param = ""
+      dims[i].dim_value = int(v)
+    return
 
 def try_export_model(file_path, batch_size, half_precision=False):
     if not os.path.exists(file_path):
@@ -25,7 +43,13 @@ def try_export_model(file_path, batch_size, half_precision=False):
           # Ensure each dimension of imgsz is divisible by 32
           imgsz = [((dim + 31) // 32) * 32 for dim in [640, 640]]
           input_name = onnx_model.graph.input[0].name
-          make_input_shape_fixed(onnx_model.graph, input_name, [batch_size, 3, 640, 640])
+          # Prefer onnxruntime's helper if available, otherwise fall back to pure onnx.
+          try:
+            from onnxruntime.tools.onnx_model_utils import make_input_shape_fixed  # type: ignore
+
+            make_input_shape_fixed(onnx_model.graph, input_name, [batch_size, 3, 640, 640])
+          except Exception:
+            _make_input_shape_fixed_fallback(onnx_model, input_name, [batch_size, 3, 640, 640])
 
           # Save the modified ONNX model
           onnx.save(onnx_model, file_path)
