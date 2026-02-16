@@ -17,9 +17,9 @@ class Model(Model):
     if not os.path.exists(self.model_path):
       raise Exception(f'Model file {self.model_path} not found')
     self.model = YOLO(self.model_path)
-    #self.model.to(self.device)
+    self.model.to(self.device)
     # Convert model to half precision (FP16)
-    self.model.model = self.model.model.cuda().fuse().half()
+    self.model.model = self.model.model.half()
     # Compile the model for improved performance
     self.model.model = torch.compile(self.model.model, mode='max-autotune-no-cudagraphs')
   def prepare(self):

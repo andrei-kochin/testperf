@@ -19,7 +19,7 @@ class Model(Model):
     self.model = YOLO(self.model_path)
     self.model.to(self.device)
     # Convert model to half precision (FP16)
-    self.model.model = self.model.model.fuse().half()
+    self.model.model = self.model.model.half()
     # Compile the model for improved performance
     self.model.model = torch.compile(self.model.model, mode='max-autotune-no-cudagraphs')
   def prepare(self):
