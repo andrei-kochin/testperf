@@ -128,11 +128,12 @@ for batch in batches:
   if model.batch_size is None or model.batch_size != batch:
     model.shutdown()
     model.batch_size = batch
-    checkpoint()
-    model.read()
-    model.warm_up()
-    spent(f"Model Warm Up {batch}")
-    warm_up_times[batch] = mul_time[-1] - mul_time[0]
+
+  checkpoint()
+  model.read()
+  model.warm_up()
+  spent(f"Model Warm Up {batch}")
+  warm_up_times[batch] = mul_time[-1] - mul_time[0]
 
   model.reset_inference_run()
   model.prepare()
