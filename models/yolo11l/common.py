@@ -1,6 +1,6 @@
 import os
 import onnx
-from onnx.helper import make_input_shape_fixed
+from onnxruntime.tools.onnx_model_utils import make_input_shape_fixed
 
 def try_export_model(file_path, batch_size, half_precision=False):
     if not os.path.exists(file_path):
