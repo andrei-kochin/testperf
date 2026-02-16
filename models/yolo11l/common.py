@@ -43,16 +43,11 @@ def try_export_model(file_path, batch_size, half_precision=False):
           # Ensure each dimension of imgsz is divisible by 32
           imgsz = [((dim + 31) // 32) * 32 for dim in [640, 640]]
           input_name = onnx_model.graph.input[0].name
-          # Prefer onnxruntime's helper if available, otherwise fall back to pure onnx.
-          try:
-            from onnxruntime.tools.onnx_model_utils import make_input_shape_fixed  # type: ignore
-
-            make_input_shape_fixed(onnx_model.graph, input_name, [batch_size, 3, 640, 640])
-          except Exception:
-            _make_input_shape_fixed_fallback(onnx_model, input_name, [batch_size, 3, 640, 640])
+          _make_input_shape_fixed_fallback(onnx_model, input_name, [batch_size, 3, 640, 640])
 
           # Save the modified ONNX model
           onnx.save(onnx_model, file_path)
+          print(f"Model saved to: {file_path}")
 
           #os.rename(yolo_model_path[:-2] + 'onnx', file_path)
         else:

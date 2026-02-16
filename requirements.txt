@@ -1,5 +1,2 @@
 openpyxl
-numpy
 onnx
-ultralytics
-onnxruntime
