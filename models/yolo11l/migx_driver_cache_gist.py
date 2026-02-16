@@ -75,6 +75,20 @@ def _looks_like_no_device_error(text: str) -> bool:
   return ("no device" in s) or ("get_device_id" in s) or ("device_name.cpp" in s)
 
 
+def _missing_migraphx_backend_lib(text: str) -> Optional[str]:
+  """
+  Detect missing MIGraphX backend shared libraries from stderr/stdout text.
+  Returns the missing library filename (e.g. "libmigraphx_cpu.so") or None.
+  """
+  s = (text or "")
+  # Typical dlopen error:
+  #   ... libmigraphx_cpu.so: cannot open shared object file: No such file or directory
+  m = re.search(r"(libmigraphx_(?:cpu|gpu|ref)\.so)[^\\n]*cannot open shared object file", s, re.IGNORECASE)
+  if m:
+    return m.group(1)
+  return None
+
+
 def get_migraphx_driver_version() -> str:
   try:
     result = subprocess.run([migx_binary, "-v"], capture_output=True, text=True, timeout=10)
@@ -282,10 +296,23 @@ def compile_to_mxr(
       break
 
     # If CPU compile fails, try ref as a last resort (when fallback is enabled).
-    if (idx == 0) and (t == "cpu") and allow_fallback:
+    # Note: CPU is often a fallback target after GPU; in that common case idx != 0,
+    # so we still want to continue to REF when enabled.
+    if (t == "cpu") and allow_fallback and ("ref" in target_order[idx + 1 :]):
       continue
 
     break
+
+  missing_lib = _missing_migraphx_backend_lib(last_err)
+  if missing_lib:
+    raise Exception(
+      "Failed to compile model via migraphx-driver because a MIGraphX backend library "
+      f"could not be loaded: {missing_lib}. "
+      "This usually means MIGraphX runtime libraries are not installed (or not on the dynamic "
+      "loader search path). On ROCm Linux, install MIGraphX (e.g. `sudo apt install -y migraphx`) "
+      "and ensure `/opt/rocm/lib` is discoverable (e.g. via `ldconfig` or `LD_LIBRARY_PATH`). "
+      f"Details: {last_err.strip()}"
+    )
 
   if _looks_like_no_device_error(last_err):
     raise Exception(
