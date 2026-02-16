@@ -137,6 +137,13 @@ for batch in batches:
 
   model.reset_inference_run()
   model.prepare()
+
+  # Few empty runs
+  cnt = 0
+  while cnt < 10:
+    model.inference()
+    cnt += 1
+
   checkpoint()
   while model.next_inference_run():
     model.inference()
