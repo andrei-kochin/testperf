@@ -21,7 +21,7 @@ class Model(Model):
         print("MIGraphX: Applying FP16 quantization...")
         migraphx.quantize_fp16(model)
         print("MIGraphX: Compiling model...")
-        model.compile(migraphx.get_target("gpu"))
+        model.compile(migraphx.get_target("gpu"), offload_copy=False)
         migraphx.save(model, cache_path)
         del model
       except Exception as e:
