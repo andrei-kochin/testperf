@@ -18,6 +18,9 @@ class Model(Model):
     if not os.path.exists(cache_path):
       try:
         model = migraphx.parse_onnx(file_path)
+        print("MIGraphX: Applying FP16 quantization...")
+        migraphx.quantize_fp16(model)
+        print("MIGraphX: Compiling model...")
         model.compile(migraphx.get_target("gpu"))
         migraphx.save(model, cache_path)
         del model
