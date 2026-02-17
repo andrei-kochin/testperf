@@ -5,12 +5,12 @@ import onnxruntime as ort
 from .common import try_export_model
 
 class Model(Model):
+  """YOLOv11l inference with using MIGraphX Execution Provider"""
   def __init__(self):
     super().__init__()
     self.sess = None
     self.sess_data = {'providers': ['MIGraphXExecutionProvider']}
     self.model_path = 'yolov11l_{batch}b.onnx'
-    self.model_description = 'YOLOv11l inference with using MIGraphX Execution Provider'
     if not self.sess_data['providers'][0] in ort.get_available_providers():
       raise Exception(f'MIGraphX Execution Provider is not available')
   def prepare_batch(self, batch_size):

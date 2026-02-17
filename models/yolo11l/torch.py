@@ -5,12 +5,12 @@ from class_model import Model
 from ultralytics import YOLO
 
 class Model(Model):
+  """YOLOv11l inference with using default Torch"""
   def __init__(self):
     super().__init__()
     self.model = None
     self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     self.model_path = './yolov11l.pt'
-    self.model_description = 'YOLOv11l inference with using default Torch'
   def read(self):
     if not os.path.exists(self.model_path):
       raise Exception(f'Model file {self.model_path} not found')

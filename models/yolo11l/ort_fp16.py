@@ -5,12 +5,12 @@ import onnxruntime as ort
 from .common import try_export_model
 
 class Model(Model):
+  """YOLOv11l FP16 inference with using ONNX Runtime"""
   def __init__(self):
     super().__init__()
     self.sess = None
     self.sess_data = {}
     self.model_path = 'yolov11l_fp16{batch}b.onnx'
-    self.model_description = 'YOLOv11l FP16 inference with using ONNX Runtime'
   def prepare_batch(self, batch_size):
     file_path = self.get_file_path(self.model_path.format(batch=batch_size))
     try_export_model(file_path, batch_size, half_precision=True)

@@ -5,12 +5,12 @@ import onnxruntime as ort
 from .common import try_export_model
 
 class Model(Model):
+  """YOLOv8n FP16 inference with using CUDA Execution Provider"""
   def __init__(self):
     super().__init__()
     self.sess = None
     self.sess_data = {'providers': ['CUDAExecutionProvider']}
     self.model_path = 'yolov8n_fp16{batch}b.onnx'
-    self.model_description = 'YOLOv8n FP16 inference with using CUDA Execution Provider'
     if not self.sess_data['providers'][0] in ort.get_available_providers():
       raise Exception(f'CUDA Execution Provider is not available')
   def prepare_batch(self, batch_size):

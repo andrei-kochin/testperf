@@ -5,12 +5,12 @@ import onnxruntime as ort
 from .common import try_export_model
 
 class Model(Model):
+  """YOLOv11l FP16 inference with using Vitis AI Execution Provider"""
   def __init__(self):
     super().__init__()
     self.sess = None
     self.sess_data = {'providers': ['VitisAIExecutionProvider']}
     self.model_path = 'yolov11l_fp16{batch}b.onnx'
-    self.model_description = 'YOLOv11l inference with using Vitis AI Execution Provider'
     if not self.sess_data['providers'][0] in ort.get_available_providers():
       raise Exception(f'Vitis AI Execution Provider is not available')
   def prepare_batch(self, batch_size):

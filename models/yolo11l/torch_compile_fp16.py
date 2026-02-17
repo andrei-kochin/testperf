@@ -5,6 +5,7 @@ from class_model import Model
 from ultralytics import YOLO
 
 class Model(Model):
+  """YOLOv11l FP16 inference with using default Torch.Compile"""
   def __init__(self):
     super().__init__()
     self.model = None
@@ -12,7 +13,6 @@ class Model(Model):
     if not torch.cuda.is_available():
       raise Exception('CUDA is not available')
     self.model_path = './yolov11l.pt'
-    self.model_description = 'YOLOv11l inference with using default Torch.Compile FP16'
   def read(self):
     if not os.path.exists(self.model_path):
       raise Exception(f'Model file {self.model_path} not found')
