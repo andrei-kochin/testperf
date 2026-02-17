@@ -5,11 +5,11 @@ import migraphx
 from .common import try_export_model
 
 class Model(Model):
+  """YOLOv8n inference using direct MIGraphX with cache"""
   def __init__(self):
     super().__init__()
     self.model = None
-    self.model_path = 'yolov11l_fp16{batch}b.onnx'
-    self.model_description = 'YOLOv11l inference using direct MIGraphX with cache'
+    self.model_path = 'yolov8n_fp16{batch}b.onnx'
   def prepare_batch(self, batch_size):
     file_path = self.get_file_path(self.model_path.format(batch=batch_size))
     try_export_model(file_path, batch_size, half_precision=True)
@@ -18,10 +18,7 @@ class Model(Model):
     if not os.path.exists(cache_path):
       try:
         model = migraphx.parse_onnx(file_path)
-        print("MIGraphX: Applying FP16 quantization...")
-        migraphx.quantize_fp16(model)
-        print("MIGraphX: Compiling model...")
-        model.compile(migraphx.get_target("gpu"), offload_copy=False)
+        model.compile(migraphx.get_target("gpu"))
         migraphx.save(model, cache_path)
         del model
       except Exception as e:

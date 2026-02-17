@@ -5,7 +5,7 @@ import subprocess
 import platform
 from time import perf_counter
 
-model_source_name = 'yolov11l_fp16{batch}b.onnx'
+model_source_name = 'yolov8n_fp16{batch}b.onnx'
 migx_binary = 'migraphx-driver.exe' if platform.system() == 'Windows' else 'migraphx-driver'
 
 # Setting batch sizes from command line
@@ -114,7 +114,7 @@ for batch in batches:
     print(f'{{ "Compiling MXR": "{mxr_path}" }},')
     try:
       start_time = perf_counter()
-      compile_cmd = [migx_binary, 'compile', model_path, '--gpu', '--binary', '-o', mxr_path]
+      compile_cmd = [migx_binary, 'compile', model_path, '--gpu', '--enable-offload-copy', '--binary', '-o', mxr_path]
       result = subprocess.run(compile_cmd, capture_output=True, text=True)
       compile_time = perf_counter() - start_time
       
@@ -133,13 +133,8 @@ for batch in batches:
   # Step 3: Run perf command
   print(f'{{ "Running Performance Test": "{mxr_path}" }},')
   try:
-    perf_cmd = [migx_binary, 'perf', '--migraphx', mxr_path]
+    perf_cmd = [migx_binary, 'perf', '--enable-offload-copy', '--migraphx', mxr_path]
     result = subprocess.run(perf_cmd, capture_output=True, text=True)
-    
-    if (result.returncode != 0) and ('MIGraphX program was likely compiled with offload_copy set' in result.stderr):
-      print(f'{{ "Warning": "Failed to run perf: {result.stderr}" }},')
-      perf_cmd.append('--enable-offload-copy')
-      result = subprocess.run(perf_cmd, capture_output=True, text=True)
     
     if result.returncode != 0:
       print(f'{{ "Error": "Failed to run perf: {result.stderr}" }},')
@@ -363,15 +358,15 @@ if inference_times:
       main_sheet.append([f'Cannot get environment variables {e}'])
     
     # Save workbook
-    workbook_name = f"{platform.node().lower()}_models.yolo11l.migx_driver_cache_fp16_{report_datetime.strftime('%Y%m%d_%H%M%S')}.xlsx"
+    workbook_name = f"{platform.node().lower()}_models.yolo8n.fp16.migx_driver_cache_{report_datetime.strftime('%Y%m%d_%H%M%S')}.xlsx"
     workbook_path = workbook_name
     
-    reports_path = os.path.join(os.path.dirname(__file__), '..', '..', 'reports', report_datetime.strftime("%Y%m%d"))
+    reports_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'reports', report_datetime.strftime("%Y%m%d"))
     if not os.path.exists(reports_path):
       os.makedirs(reports_path)
       try:
         from shutil import copy
-        copy(os.path.join(os.path.dirname(__file__), '..', '..', "!StatViewer.xlsm"),
+        copy(os.path.join(os.path.dirname(__file__), '..', '..', '..', "!StatViewer.xlsm"),
              os.path.join(reports_path, "!StatViewer.xlsm"))
       except Exception as e:
         print(f'{{ "Error": "Failed to copy !StatViewer.xlsm {e}" }}')

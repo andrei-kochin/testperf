@@ -3,7 +3,10 @@ import sys
 from time import perf_counter
 import platform
 
-model_name = sys.argv[1] if len(sys.argv) > 1 else 'test_model'
+# Accept model name with dot delimiter or directory separator (backslash or forward slash)
+model_name = sys.argv[1].replace('/', '.').replace('\\', '.') if len(sys.argv) > 1 else 'test_model'
+if model_name.endswith('.py'):
+  model_name = model_name[:-3]
 
 print(f'{{ "Model": "{model_name}",')
 print(f'"Hostname": "{platform.node()}",')
@@ -128,14 +131,22 @@ for batch in batches:
   if model.batch_size is None or model.batch_size != batch:
     model.shutdown()
     model.batch_size = batch
-    checkpoint()
-    model.read()
-    model.warm_up()
-    spent(f"Model Warm Up {batch}")
-    warm_up_times[batch] = mul_time[-1] - mul_time[0]
+
+  checkpoint()
+  model.read()
+  model.warm_up()
+  spent(f"Model Warm Up {batch}")
+  warm_up_times[batch] = mul_time[-1] - mul_time[0]
 
   model.reset_inference_run()
   model.prepare()
+
+  # Few empty runs
+  cnt = 0
+  while cnt < 10:
+    model.inference()
+    cnt += 1
+
   checkpoint()
   while model.next_inference_run():
     model.inference()

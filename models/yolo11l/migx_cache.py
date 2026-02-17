@@ -5,11 +5,11 @@ import migraphx
 from .common import try_export_model
 
 class Model(Model):
+  """YOLOv11l inference using direct MIGraphX with cache"""
   def __init__(self):
     super().__init__()
     self.model = None
     self.model_path = 'yolov11l_{batch}b.onnx'
-    self.model_description = 'YOLOv11l inference using direct MIGraphX with cache'
   def prepare_batch(self, batch_size):
     file_path = self.get_file_path(self.model_path.format(batch=batch_size))
     try_export_model(file_path, batch_size)
