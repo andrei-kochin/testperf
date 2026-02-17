@@ -3,7 +3,10 @@ import sys
 from time import perf_counter
 import platform
 
-model_name = sys.argv[1] if len(sys.argv) > 1 else 'test_model'
+# Accept model name with dot delimiter or directory separator (backslash or forward slash)
+model_name = sys.argv[1].replace('/', '.').replace('\\', '.') if len(sys.argv) > 1 else 'test_model'
+if model_name.endswith('.py'):
+  model_name = model_name[:-3]
 
 print(f'{{ "Model": "{model_name}",')
 print(f'"Hostname": "{platform.node()}",')
