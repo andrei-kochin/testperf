@@ -19,9 +19,10 @@ class Model(Model):
     self.model = YOLO(self.model_path)
     self.model.to(self.device)
     # Convert model to half precision (FP16)
-    self.model.model = self.model.model.half()
+    self.model = self.model.model.fuse().half()
+    #self.model.model = self.model.model.fuse().half()
     # Compile the model for improved performance
-    self.model.model = torch.compile(self.model.model, mode='max-autotune-no-cudagraphs')
+    self.model = torch.compile(self.model, mode='max-autotune-no-cudagraphs')
   def prepare(self):
     # Create random input tensor (B, C, H, W) in half precision
     self.input_data = torch.randn(
@@ -35,7 +36,7 @@ class Model(Model):
     self.input_data = self.input_data.cuda().half()
   def inference(self):
     with torch.no_grad():
-      return self.model.model(self.input_data)
+      return self.model(self.input_data)
   def shutdown(self):
     if self.model is not None:
       del self.model
