@@ -41,7 +41,8 @@ if '--batch-size' in sys.argv:
   try:
     batches = [int(x) for x in sys.argv[sys.argv.index('--batch-size') + 1].split(',')]
   except Exception as e:
-    print(f'{{ "Error": "Failed to set batch size {e}, using default [{', '.join(batches)}]" }},')
+    batch_str = ", ".join(map(str, batches))
+    print(f'{{ "Error": "Failed to set batch size {e}, using default [{batch_str}]" }},')
 
 mul_time = []
 def checkpoint(do_reset = True):
